@@ -1,0 +1,48 @@
+diff --git a/packages/web-host/src/backend-launcher.ts b/packages/web-host/src/backend-launcher.ts
+index 7d88140..a1841c3 100644
+--- a/packages/web-host/src/backend-launcher.ts
++++ b/packages/web-host/src/backend-launcher.ts
+@@ -665,7 +665,8 @@ export class BackendLifecycleManager {
+     const args = buildSpawnArgs({
+       port: this._port,
+       dbPath,
+-      local: true,
++      // railway: --local turns off aioncore's authentication for the whole API.
++      local: false,
+       parentPid: process.pid,
+       logDir,
+       workDir: dirs?.workDir,
+diff --git a/packages/web-host/src/static-server.ts b/packages/web-host/src/static-server.ts
+index 130cc98..0c4f2d6 100644
+--- a/packages/web-host/src/static-server.ts
++++ b/packages/web-host/src/static-server.ts
+@@ -76,13 +76,28 @@ function getLanIP(): string | null {
+   return pickLanIP(networkInterfaces());
+ }
+ 
++// railway: aioncore enforces double-submit CSRF outside --local, but the SPA never
++// sends x-csrf-token yet. Fill it from the cookie for same-origin browser requests;
++// cross-site requests (Origin host != Host) still fail the check.
++function withCsrfHeader(req: IncomingMessage): http.IncomingHttpHeaders {
++  const headers = { ...req.headers };
++  const origin = req.headers.origin;
++  let sameOrigin = false;
++  try {
++    sameOrigin = !!origin && new URL(origin).host === req.headers.host;
++  } catch {}
++  const token = /(?:^|;\s*)aionui-csrf-token=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
++  if (sameOrigin && token && !headers['x-csrf-token']) headers['x-csrf-token'] = token;
++  return headers;
++}
++
+ function forwardToBackend(req: IncomingMessage, res: ServerResponse, backendPort: number): void {
+   const options: http.RequestOptions = {
+     hostname: '127.0.0.1',
+     port: backendPort,
+     path: req.url,
+     method: req.method,
+-    headers: { ...req.headers, host: `127.0.0.1:${backendPort}` },
++    headers: { ...withCsrfHeader(req), host: `127.0.0.1:${backendPort}` },
+   };
+   const proxy = http.request(options, (proxyRes) => {
+     res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
