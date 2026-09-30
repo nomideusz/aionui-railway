@@ -51,18 +51,21 @@ if [ -n "$pkgs" ]; then
     echo "agent CLI install failed, starting with what is there"
   fi
   rm -rf /tmp/npm-cache
-  # The install leaves ~2 GB of page cache, which Railway counts as the service's memory,
-  # and the container can't drop caches, so evict the CLIs' files from it one by one.
-  python3 - "$AGENTS_DIR" <<'EOF'
+fi
+
+# Railway counts page cache as the service's memory. Reading the CLIs (the install,
+# AionUi's startup probes, agent runs) leaves up to ~2 GB of it, and nothing reclaims
+# it below the plan's limit. The container can't drop caches, so evict the CLIs'
+# files every 5 minutes. Pages that running agents have mapped stay put.
+[ -z "$pkgs" ] || ( while sleep 300; do python3 - "$AGENTS_DIR" <<'EOF' || :
 import os, sys
-os.sync()
 for d, _, fs in os.walk(sys.argv[1]):
     for f in fs:
         try: fd = os.open(os.path.join(d, f), os.O_RDONLY | os.O_NOFOLLOW)
         except OSError: continue
         os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED); os.close(fd)
 EOF
-fi
+done ) &
 
 # Codex's bubblewrap sandbox can't create namespaces inside a container, so each
 # sandboxed command fails and is retried with a second approval. The container is
