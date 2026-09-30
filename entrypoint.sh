@@ -43,12 +43,25 @@ done
 if [ -n "$pkgs" ]; then
   echo "installing/updating agent CLIs:$pkgs"
   # A failed update keeps the old CLIs, and a failed first install retries on the next boot.
-  if timeout 240 npm install -g --prefix "$AGENTS_DIR" --no-fund --no-audit --no-update-notifier --loglevel=error \
+  # The npm cache goes to /tmp, so it doesn't keep ~750 MB on the volume.
+  if timeout 240 npm install -g --prefix "$AGENTS_DIR" --cache /tmp/npm-cache --no-fund --no-audit --no-update-notifier --loglevel=error \
        $(for p in $pkgs; do echo "$p@latest"; done); then
     echo "$pkgs" > "$AGENTS_DIR/.list"
   else
     echo "agent CLI install failed, starting with what is there"
   fi
+  rm -rf /tmp/npm-cache
+  # The install leaves ~2 GB of page cache, which Railway counts as the service's memory,
+  # and the container can't drop caches, so evict the CLIs' files from it one by one.
+  python3 - "$AGENTS_DIR" <<'EOF'
+import os, sys
+os.sync()
+for d, _, fs in os.walk(sys.argv[1]):
+    for f in fs:
+        try: fd = os.open(os.path.join(d, f), os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError: continue
+        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED); os.close(fd)
+EOF
 fi
 
 # Codex's bubblewrap sandbox can't create namespaces inside a container, so each
