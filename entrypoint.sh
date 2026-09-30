@@ -20,4 +20,44 @@ if [ "$new" != "$(cat "$STAMP" 2>/dev/null)" ]; then
   echo "$new" > "$STAMP"
   echo "admin password changed: existing sessions revoked"
 fi
+
+# Agent CLIs for AionUi to detect on $PATH. They live on the volume and are
+# updated on every boot, because a copy baked into the image would go stale.
+# Short names map to npm packages, and anything else is used as an npm package name.
+# AIONUI_AGENTS=none installs none.
+AGENTS_DIR="$AIONUI_DATA_DIR/agents"
+pkgs=""
+for a in $(echo "${AIONUI_AGENTS-claude,codex,gemini,opencode}" | tr ',' ' '); do
+  case "$a" in
+    claude) pkgs="$pkgs @anthropic-ai/claude-code" ;;
+    codex) pkgs="$pkgs @openai/codex" ;;
+    gemini) pkgs="$pkgs @google/gemini-cli" ;;
+    opencode) pkgs="$pkgs opencode-ai" ;;
+    qwen) pkgs="$pkgs @qwen-code/qwen-code" ;;
+    none) ;;
+    *) pkgs="$pkgs $a" ;;
+  esac
+done
+# A changed list starts from scratch, so agents that were removed from it disappear.
+[ "$pkgs" = "$(cat "$AGENTS_DIR/.list" 2>/dev/null)" ] || rm -rf "$AGENTS_DIR"
+if [ -n "$pkgs" ]; then
+  echo "installing/updating agent CLIs:$pkgs"
+  # A failed update keeps the old CLIs, and a failed first install retries on the next boot.
+  if timeout 240 npm install -g --prefix "$AGENTS_DIR" --no-fund --no-audit --loglevel=error \
+       $(for p in $pkgs; do echo "$p@latest"; done); then
+    echo "$pkgs" > "$AGENTS_DIR/.list"
+  else
+    echo "agent CLI install failed, starting with what is there"
+  fi
+fi
+
+# Codex's bubblewrap sandbox can't create namespaces inside a container, so each
+# sandboxed command fails and is retried with a second approval. The container is
+# the sandbox: default Codex to full access unless its config sets a mode. The line
+# goes first, because top-level TOML keys must come before any [table].
+C="$HOME/.codex/config.toml"
+if ! grep -qs '^sandbox_mode' "$C"; then
+  mkdir -p "${C%/*}"
+  { echo 'sandbox_mode = "danger-full-access"'; cat "$C" 2>/dev/null || true; } > "$C.tmp" && mv "$C.tmp" "$C"
+fi
 exec /opt/aionui-web/aionui-web start

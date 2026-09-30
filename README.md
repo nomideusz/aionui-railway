@@ -10,7 +10,7 @@ One service, one volume at `/data`.
 
 The image runs the upstream AionUi web runtime and its Rust backend (AionCore), built from the upstream release tag. AionUi's own remote mode starts the backend with authentication switched off. This build turns authentication on and adds the CSRF handling the web client does not send yet. The changes are in `build/remote-auth.patch`. Every API call and WebSocket needs a login session, and requests from other sites are rejected.
 
-The admin password comes from a Railway variable and is applied on every boot. Conversations, settings, provider keys (encrypted at rest), skills and agent workspaces live on the volume.
+The admin password comes from a Railway variable and is applied on every boot. Claude Code, Codex, Gemini CLI and OpenCode are installed on the volume and updated to their latest versions on every boot, so AionUi can use them as agents. Conversations, settings, provider keys (encrypted at rest), skills and agent workspaces live on the volume.
 
 ## Common Use Cases
 
@@ -21,7 +21,7 @@ The admin password comes from a Railway variable and is applied on every boot. C
 
 ## Dependencies for AionUi Hosting
 
-- An API key for at least one LLM provider (OpenRouter gives access to most models with one key)
+- An API key for at least one LLM provider (OpenRouter gives access to most models with one key), or a Claude, ChatGPT or Google account for the agent CLIs. OpenCode's free models need no key at all.
 
 ### Deployment Dependencies
 
@@ -41,12 +41,22 @@ The admin password comes from a Railway variable and is applied on every boot. C
 
 **Using the agent:** the built-in **Aion CLI** agent asks before it runs a command or writes a file. Pick "allow once" or "allow always", or change the permission mode under the message box. Files it creates appear in the side panel, and each conversation gets its own workspace on the volume.
 
+**Agent CLIs:** pick an agent above the message box. Each one signs in its own way:
+
+- **OpenCode** works right away with its free models, no key needed.
+- **Claude Code:** run `claude setup-token` on your own computer to use your Claude Pro/Max plan, and paste the token into `CLAUDE_CODE_OAUTH_TOKEN`. Or set `ANTHROPIC_API_KEY`.
+- **Codex:** set `OPENAI_API_KEY`. To use a ChatGPT plan instead, open a shell with `railway ssh` and run `codex login --device-auth`.
+- **Gemini CLI:** set `GEMINI_API_KEY` (Google AI Studio has a free tier).
+
+`AIONUI_AGENTS` picks which CLIs are installed: any of `claude`, `codex`, `gemini`, `opencode` and `qwen`, or any npm package name, comma-separated. Set it to `none` to install none. Claude Code and Codex still ask in AionUi before they run a command.
+
 **Changing the password:** edit `AIONUI_ADMIN_PASSWORD` and redeploy. This also signs out every existing session. A redeploy that leaves the password unchanged keeps you logged in. The in-app WebUI password controls are not available on this build: they are local-only endpoints that stay locked when authentication is on.
 
 Notes and limits:
 
-- Aion CLI is built in. The other agents in the list (Claude Code, Codex, Gemini CLI and more) are only detected when their CLI is installed, and this image does not ship them.
-- It is very light: about 75 MB of RAM idle and roughly 220 MB of disk on first boot, mostly the bundled Node runtime. Give it more memory if agents run heavy builds.
+- AionUi itself is light, at about 75 MB of RAM idle. Each running agent CLI session adds about 200–250 MB, so give it more memory if you run several at once or agents run heavy builds.
+- The four agent CLIs take about 1.1 GB of the volume and add a few seconds to each boot while they update. If one reports that it is newer than the version AionUi verified, that is expected and it still works.
+- Codex defaults to full access here, because its own sandbox cannot run inside a container. The container is the sandbox, and AionUi still asks before commands run.
 - The agent's commands run inside the container as root. Anything outside `/data` resets on redeploy.
 - Upgrades come through this template's repository, which rebuilds each new AionUi release with the authentication patch.
 
