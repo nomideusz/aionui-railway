@@ -41,7 +41,7 @@ The admin password comes from a Railway variable and is applied on every boot. C
 
 **Using the agent:** the built-in **Aion CLI** agent asks before it runs a command or writes a file. Pick "allow once" or "allow always", or change the permission mode under the message box. Files it creates appear in the side panel, and each conversation gets its own workspace on the volume.
 
-**Changing the password:** edit `AIONUI_ADMIN_PASSWORD` and redeploy. The in-app WebUI password controls are not available on this build: they are local-only endpoints that stay locked when authentication is on.
+**Changing the password:** edit `AIONUI_ADMIN_PASSWORD` and redeploy. This also signs out every existing session. A redeploy that leaves the password unchanged keeps you logged in. The in-app WebUI password controls are not available on this build: they are local-only endpoints that stay locked when authentication is on.
 
 Notes and limits:
 
