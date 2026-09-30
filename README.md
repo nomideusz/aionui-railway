@@ -54,7 +54,7 @@ The admin password comes from a Railway variable and is applied on every boot. C
 
 Notes and limits:
 
-- AionUi itself is light, at about 75 MB of RAM idle. Each running agent CLI session adds about 200–250 MB, so give it more memory if you run several at once or agents run heavy builds.
+- AionUi itself is light, at about 75 MB of RAM idle. Each running agent CLI adds about 200–600 MB (OpenCode is the heaviest) and is stopped after 10 idle minutes. Give it more memory if you run several at once or agents run heavy builds.
 - The four agent CLIs take about 1.1 GB of the volume and add a few seconds to each boot while they update. If one reports that it is newer than the version AionUi verified, that is expected and it still works.
 - Codex defaults to full access here, because its own sandbox cannot run inside a container. The container is the sandbox, and AionUi still asks before commands run.
 - The agent's commands run inside the container as root. Anything outside `/data` resets on redeploy.
