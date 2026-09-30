@@ -43,7 +43,7 @@ done
 if [ -n "$pkgs" ]; then
   echo "installing/updating agent CLIs:$pkgs"
   # A failed update keeps the old CLIs, and a failed first install retries on the next boot.
-  if timeout 240 npm install -g --prefix "$AGENTS_DIR" --no-fund --no-audit --loglevel=error \
+  if timeout 240 npm install -g --prefix "$AGENTS_DIR" --no-fund --no-audit --no-update-notifier --loglevel=error \
        $(for p in $pkgs; do echo "$p@latest"; done); then
     echo "$pkgs" > "$AGENTS_DIR/.list"
   else
