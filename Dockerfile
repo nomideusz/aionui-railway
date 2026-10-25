@@ -3,6 +3,7 @@
 # deploy only downloads it instead of building AionUi from source.
 # node/npm: the agent CLIs (AIONUI_AGENTS) are npm packages, installed on the volume at boot.
 FROM node:22-bookworm-slim
+# upgrade: github iOfficeAI/AionUi
 ARG AIONUI_VERSION=2.2.2
 ARG AIONUI_SHA256=3d5f81c79e80136dc54fdd28349f76fb5788173e42606876adde3a3d848f711b
 # libicu: officecli (Office previews) aborts without it. git/curl/python3: agent tools.
